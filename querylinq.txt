@@ -1,0 +1,43 @@
+var query = from d in dbContext.tmSrcDef
+            join e in dbContext.tmExtract.Where(e => e.CycleType == "D" && e.DateOfSrcData == "03/09/2023")
+            on d.SrcName equals e.SrcName into g1
+            from e in g1.DefaultIfEmpty()
+            join s in dbContext.tmSrcLoad.Where(s => s.CycleType == "D" && s.DateOfSrcData == "03/09/2023")
+            on e.ExtractKey equals s.ExtractKey into g2
+            from s in g2.DefaultIfEmpty()
+            join sfa in dbContext.tmSrcFileAlias
+            on d.SrcName equals sfa.SrcName into g3
+            from sfa in g3.DefaultIfEmpty()
+            join sftd in dbContext.tmSrcFileTransformDef.Where(sftd => sftd.CycleType == s.CycleType)
+            on sfa.SrcFileAlias equals sftd.SrcFileAlias into g4
+            from sftd in g4.DefaultIfEmpty()
+            join p2 in dbContext.tmParmDef.Where(p2 => p2.ParmName == "SrcFileSystem")
+            on d.SrcName equals p2.ParmGroup into g5
+            from p2 in g5.DefaultIfEmpty()
+            join p in dbContext.tmSrcLoad.Where(p => p.CycleType == "D" && p.DateOfSrcData == "03/08/2023")
+            on d.SrcName equals p.SrcName into g6
+            from p in g6.DefaultIfEmpty()
+            where d.PermActiveFlag == "Y" && (d.CycleType == "B" || d.CycleType == "D")
+            orderby d.SrcName, s.StartTime
+            select new {
+                d.SrcName,
+                d.ActiveFlag,
+                d.PermActiveFlag,
+                s.DateOfSrcData,
+                s.StatusCode,
+                Status = s.StatusCode == "LC" ? "Complete" : s.StatusCode == "LP" ? "Pending" : s.StatusCode == "LF" ? "Failed" : s.StatusCode,
+                s.RecCount,
+                ProcessDate = s.StartTime.ToString("MM/dd/yyyy"),
+                StartTime = s.StartTime.ToString("hh:mm:ss tt"),
+                Minutes = s.StartTime != null && s.EndTime != null ? SqlFunctions.DateDiff("minute", s.StartTime, s.EndTime) : (int?)null,
+                s.SrcLoadKey,
+                s.ArchiveFullFileName,
+                ExtractRecCount = e != null ? e.RecCount : (int?)null,
+                PrevRecCount = p != null ? p.RecCount : (int?)null,
+                ExtractStartTime = e != null ? e.StartTime.ToString("hh:mm:ss tt") : null,
+                ExtractMinutes = e != null && e.Endtime != null ? SqlFunctions.DateDiff("minute", e.StartTime, e.Endtime) : (int?)null,
+                SourceFile = sftd != null ? sftd.OrigSrcFile.Trim() : null,
+                SourcePath = sftd != null ? sftd.OrigSrcPath.Trim() : null,
+                SrcFileSystem = p2 != null ? p2.ValChar.Trim() : null,
+                sftd.EAICode
+            };
